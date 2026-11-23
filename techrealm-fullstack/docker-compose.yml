@@ -1,0 +1,42 @@
+# Starts the whole Tech Realm stack: database, API and website.
+# Run:  docker compose up -d --build
+# Then open:  http://localhost:8080
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: techrealm
+      POSTGRES_USER: techrealm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}
+    volumes:
+      - db-data:/var/lib/postgresql/data   # keeps data when containers restart
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techrealm -d techrealm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ./server
+    environment:
+      DATABASE_URL: postgres://techrealm:${POSTGRES_PASSWORD}@db:5432/techrealm
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your .env file}
+      CORS_ORIGIN: http://localhost:8080
+      PORT: 4000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build: ./client
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  db-data:
